@@ -1,0 +1,252 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { randomAllocateWaitlistedTeams } from '../utils/allocation';
+import Navbar from '../components/Navbar';
+import LoadingSpinner from '../components/LoadingSpinner';
+import Toast from '../components/Toast';
+import { 
+  Users, Trophy, FileCheck, PlayCircle, Send, Shuffle, 
+  BarChart3, CheckCircle, Clock, PlusCircle, RotateCcw, Pencil, Trash2
+} from 'lucide-react';
+
+const AdminDashboard = () => {
+  const [settings, setSettings] = useState(null);
+  const [teams, setTeams] = useState([]);
+  const [allocations, setAllocations] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [problems, setProblems] = useState([]);
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  // Add Problem Form States
+  const [showAddProblem, setShowAddProblem] = useState(false);
+  const [newProblemCode, setNewProblemCode] = useState('');
+  const [newProblemTitle, setNewProblemTitle] = useState('');
+  const [newProblemDescription, setNewProblemDescription] = useState('');
+  const [newProblemCapacity, setNewProblemCapacity] = useState(4);
+  const [addingProblem, setAddingProblem] = useState(false);
+  const [expandedProblems, setExpandedProblems] = useState({});
+
+  // Edit Problem States
+  const [editingProblem, setEditingProblem] = useState(null);
+  const [editProblemCode, setEditProblemCode] = useState('');
+  const [editProblemTitle, setEditProblemTitle] = useState('');
+  const [editProblemDescription, setEditProblemDescription] = useState('');
+  const [editProblemCapacity, setEditProblemCapacity] = useState(4);
+  const [updatingProblem, setUpdatingProblem] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    await Promise.all([
+      fetchSettings(),
+      fetchTeams(),
+      fetchAllocations(),
+      fetchSubmissions(),
+      fetchProblems(),
+    ]);
+    calculateStats();
+    setLoading(false);
+  };
+
+  const fetchSettings = async () => {
+    const { data } = await supabase
+      .from('hackathon_settings')
+      .select('*')
+      .eq('id', 1)
+      .single();
+
+    setSettings(data);
+  };
+
+  const fetchTeams = async () => {
+    const { data } = await supabase
+      .from('teams')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    setTeams(data || []);
+  };
+
+  const fetchAllocations = async () => {
+    const { data } = await supabase
+      .from('project_requests')
+      .select('*, teams(team_name), problem_statements(title)')
+      .order('requested_at', { ascending: false });
+
+    setAllocations(data || []);
+  };
+
+  const fetchSubmissions = async () => {
+    const { data } = await supabase
+      .from('submissions')
+      .select('*, teams(team_name)')
+      .order('submitted_at', { ascending: false });
+
+    setSubmissions(data || []);
+  };
+
+  const fetchProblems = async () => {
+    const { data} = await supabase
+      .from('problem_statements')
+      .select('*')
+      .order('title');
+
+    setProblems(data || []);
+  };
+
+  const calculateStats = () => {
+    const waitlisted = allocations.filter(a => a.status === 'waitlist').length;
+    const allocated = allocations.filter(a => a.status === 'allocated').length;
+    
+    setStats({
+      totalTeams: teams.length,
+      totalProblems: problems.length,
+      totalSubmissions: submissions.length,
+      waitlistedTeams: waitlisted,
+      allocatedTeams: allocated,
+    });
+  };
+
+  const handleToggleProjectRequest = async () => {
+    try {
+      const newState = !settings?.project_request_open;
+      const { error } = await supabase.rpc('toggle_project_request', {
+        p_open: newState
+      });
+
+      if (error) throw error;
+
+      setToast({ 
+        message: newState 
+          ? 'Project requests opened! Teams can now select problems.' 
+          : 'Project requests closed!', 
+        type: 'success' 
+      });
+      await fetchSettings();
+    } catch (error) {
+      setToast({ message: error.message || 'Failed to toggle project requests', type: 'error' });
+    }
+  };
+
+  const handleStartHackathon = async () => {
+    try {
+      const { error } = await supabase.rpc('start_hackathon', {
+        p_duration_hours: 72
+      });
+
+      if (error) throw error;
+
+      setToast({ message: '🎉 Hackathon started! 72-hour timer is now running.', type: 'success' });
+      await fetchSettings();
+    } catch (error) {
+      setToast({ message: error.message || 'Failed to start hackathon', type: 'error' });
+    }
+  };
+
+  const handleRestartTimer = async () => {
+    try {
+      const { error } = await supabase
+        .from('hackathon_settings')
+        .update({
+          hackathon_start_time: new Date().toISOString(),
+          hackathon_end_time: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', 1);
+
+      if (error) throw error;
+
+      setToast({ message: '🔄 Timer restarted! New 72-hour countdown started.', type: 'success' });
+      await fetchSettings();
+    } catch (error) {
+      setToast({ message: error.message || 'Failed to restart timer', type: 'error' });
+    }
+  };
+
+  const handleToggleSubmission = async () => {
+    try {
+      const newState = !settings?.submission_open;
+      const { error } = await supabase.rpc('toggle_submission', {
+        p_open: newState
+      });
+
+      if (error) throw error;
+
+      setToast({ 
+        message: newState 
+          ? 'Submissions opened! Teams can now submit their projects.' 
+          : 'Submissions closed!', 
+        type: 'success' 
+      });
+      await fetchSettings();
+    } catch (error) {
+      setToast({ message: error.message || 'Failed to toggle submissions', type: 'error' });
+    }
+  };
+
+  const handleRandomAllocation = async () => {
+    try {
+      const result = await randomAllocateWaitlistedTeams(supabase);
+      
+      if (result.success) {
+        setToast({ message: result.message, type: 'success' });
+        await fetchAllocations();
+        calculateStats();
+      } else {
+        setToast({ message: result.message, type: 'error' });
+      }
+    } catch (error) {
+      setToast({ message: 'Failed to allocate waitlisted teams', type: 'error' });
+    }
+  };
+
+  const handleAddProblem = async (e) => {
+    e.preventDefault();
+    setAddingProblem(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('problem_statements')
+        .insert({
+          code: newProblemCode.toUpperCase(),
+          title: newProblemTitle,
+          description: newProblemDescription,
+          capacity: newProblemCapacity,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setToast({ message: 'Problem statement added successfully!', type: 'success' });
+      
+      // Reset form
+      setNewProblemCode('');
+      setNewProblemTitle('');
+      setNewProblemDescription('');
+      setNewProblemCapacity(4);
+      setShowAddProblem(false);
+      
+      // Refresh problems list
+      await fetchProblems();
+      calculateStats();
+    } catch (error) {
+      let message = error.message || 'Failed to add problem';
+      if (message.includes('duplicate') || message.includes('unique')) {
+        message = 'Problem code already exists';
+      }
+      setToast({ message, type: 'error' });
+    } finally {
+      setAddingProblem(false);
+    }
+  };
+
+  const toggleProblemExpand = (problemId) => {
+    setExpandedProblems(prev => ({
+      ...prev,
+      [problemId]: !prev[problemId]
+    }));

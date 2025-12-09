@@ -195,11 +195,12 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '2rem',
+    padding: '1rem',
   },
   container: {
     width: '100%',
     maxWidth: '500px',
+    padding: '0 0.5rem',
   },
   header: {
     textAlign: 'center',
@@ -213,13 +214,13 @@ const styles = {
     marginBottom: '1rem',
   },
   title: {
-    fontSize: '2.5rem',
+    fontSize: 'clamp(1.5rem, 5vw, 2.5rem)',
     color: 'white',
     marginBottom: '0.5rem',
     fontWeight: '700',
   },
   subtitle: {
-    fontSize: '1.25rem',
+    fontSize: 'clamp(1rem, 3vw, 1.25rem)',
     color: 'var(--text-secondary)',
     marginBottom: '0.25rem',
   },
@@ -256,7 +257,7 @@ const styles = {
   },
   features: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
     gap: '1rem',
   },
 };

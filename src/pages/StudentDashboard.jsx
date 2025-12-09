@@ -196,7 +196,7 @@ const styles = {
   container: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '2rem',
+    padding: 'clamp(1rem, 3vw, 2rem)',
   },
   header: {
     textAlign: 'center',
